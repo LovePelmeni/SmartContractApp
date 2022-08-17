@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	"net/http"
@@ -14,8 +15,10 @@ import (
 
 	"github.com/LovePelmeni/ContractApp/blockchain/transactions/ethereum"
 	"github.com/LovePelmeni/ContractApp/exceptions"
+
 	"github.com/LovePelmeni/ContractApp/models"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 )
@@ -53,18 +56,29 @@ func DeleteCustomerRestController(context *gin.Context) {
 
 // Smart Contracts Rest API Endpoints
 
-func PurchaseContractRestController(context *gin.Context) {
+func PurchaseContractRestController(RequestContext *gin.Context) {
 	// Rest Controller, Responsible for Purchasing Smart Contracts
 
-	PurchaserId := context.Query("customerId")
-	SmartContractId := context.Query("smartContractId")
+	Purchaser := Customer.Get(RequestContext.Query("customerId"))
+	SmartContract, _ := SmartContract.Get(RequestContext.Query("smartContractId"))
 
-	ContractTransactionMetadata, _ := json.Marshal(context.PostForm(""))
-	Method := context.PostForm("Method")
+
+	ContractTransactionMetadata, _ := json.Marshal(RequestContext.PostForm("ContractMetadata"))
+	Method := RequestContext.PostForm("Method")
+
+	TimeoutContext, CancelFunc := context.WithTimeout(context.Background(), time.Second*10)
+	defer CancelFunc()
+
+	TransactionOptions := &bind.TransactOpts{
+		From: common.HexToAddress(Purchaser.AccountBlockChainAddress),
+		Value: big.NewInt(int64(SmartContract.Cost)), 
+		Context: TimeoutContext,
+	}
 
 	SmartContractManager := ethereum.NewSmartContractManager(Customer.AccountBlockChainAddress)
 	ContractTransaction, TransactError := SmartContractManager.TransactSmartContract(
-		SmartContractId,
+		TransactionOptions,
+		fmt.Sprint(SmartContract.ID),
 		ContractTransactionMetadata,
 		Method,
 	)
@@ -74,12 +88,12 @@ func PurchaseContractRestController(context *gin.Context) {
 
 	// Case Smart Contract, that Purchaser is trying to Buy, Does Not Exist
 	case errors.Is(TransactError, exceptions.SmartContractDoesNotExist()):
-		context.AbortWithStatusJSON(http.StatusBadGateway, gin.H{
+		RequestContext.AbortWithStatusJSON(http.StatusBadGateway, gin.H{
 			"Error": "Oops, Looks Like, it has been already Purchased by Someone Else :("})
 
 	// Case of Some Unknown Error, Occurred, while Performing Smart Contract Transaction
 	case errors.Is(TransactError, exceptions.UnknownSmartContractError()):
-		context.AbortWithStatusJSON(http.StatusBadGateway,
+		RequestContext.AbortWithStatusJSON(http.StatusBadGateway,
 			gin.H{"Error": "Unknown Smart Contract Error, Please Write Feedback to the Support"})
 
 	// Case Transaction has been Executed Successfully and Contract Transaction is not None
@@ -90,17 +104,20 @@ func PurchaseContractRestController(context *gin.Context) {
 		Transaction := ContractTransaction.(ethereum.SmartContractTransaction)
 
 		newSmartContractTransaction := models.NewSmartContractTransaction(
-			PurchaserId,
-			OwnerId,
+			fmt.Sprint(Purchaser.ID),
+			fmt.Sprint(Transaction.Owner.ID),
+			Transaction.Cost,
+			Transaction.TransactionInputData,
 		)
-		_, Saved := newSmartContractTransaction.Save(*newSmartContractTransaction)
 
-		if Saved == nil {
-			context.JSON(http.StatusCreated,
+		Saved := newSmartContractTransaction.Create()
+
+		if Saved == true {
+			RequestContext.JSON(http.StatusCreated,
 				gin.H{"Status": "Smart Contract has been Purchased :)"})
 
 		} else {
-			context.JSON(http.StatusBadGateway, gin.H{"Error": "Don't Worry, You successfully Charged Smart Contract," +
+			RequestContext.JSON(http.StatusBadGateway, gin.H{"Error": "Don't Worry, You successfully Charged Smart Contract," +
 				"But You won't Temporarily See Your Payment At Profile"})
 		}
 	}
@@ -149,16 +166,17 @@ func CreateContractRestController(RequestContext *gin.Context) {
 			Transaction.Protected(),
 			CustomerId,
 		)
-		_, Saved := newSmartContract.SaveContract(*newSmartContract)
+		_, Saved := newSmartContract.Create()
 
 		if Saved {
 			RequestContext.JSON(http.StatusCreated,
-				gin.H{"Status": "Smart Contract has been Deployed :)"})
+			gin.H{"Status": "Smart Contract has been Deployed :)"})
+			
 		} else {
 			ErrorLogger.Printf("Failed to Create New Smart Contract ORM Object, Error: %s", Saved)
 			RequestContext.JSON(http.StatusBadGateway,
 				gin.H{"Error": "Don't worry, your Contract has been Deployed, but there is Some Issues," +
-					"Locally, So you are temporarily not able to see new Contracts at your Profile"})
+				"Locally, So you are temporarily not able to see new Contracts at your Profile"})
 		}
 	}
 }

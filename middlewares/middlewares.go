@@ -58,3 +58,15 @@ func CheckPurchaserIsNotSmartContractOwnerMiddleware() gin.HandlerFunc {
 		}
 	}
 }
+
+func PrePurchaseSmartContractMiddleware() gin.HandlerFunc {
+	return func(context *gin.Context) {
+
+	}
+}
+
+func PreCreateSmartContractMiddleware() gin.HandlerFunc {
+	return func(context *gin.Context) {
+
+	}
+}

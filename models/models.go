@@ -127,6 +127,38 @@ func (this *SmartContractModelValidator) Validate(InputData interface{}) (bool, 
 	}
 }
 
+// Validator For Validating Smart Contract Transaction Model
+
+type SmartContractTransactionModelValidator struct{}
+
+func NewSmartContractTransactionModelValidator() *SmartContractTransactionModelValidator {
+	return &SmartContractTransactionModelValidator{}
+}
+
+func (this *SmartContractTransactionModelValidator) GetRegexValidationPatterns() map[string]string {
+	return map[string]string{
+		"Cost":        "^[0-9]{1,}$",
+		"PurchaserId": "^[0-9]{1,}$",
+		"OwnerId":     "^[0-9]{1,}$",
+	}
+}
+
+func (this *SmartContractTransactionModelValidator) Validate(InputData interface{}) (bool, []error) {
+	var ValidationErrors []error
+	Patterns := this.GetRegexValidationPatterns()
+	for Field, Value := range InputData.(map[string]string) {
+		if Matches, Error := regexp.MatchString(Patterns[Field], Value); Matches != true || Error != nil {
+			ValidationErrors = append(ValidationErrors,
+				errors.New(fmt.Sprintf("Invalid Value for Field `%s`", Field)))
+		}
+	}
+	if len(ValidationErrors) != 0 {
+		return false, ValidationErrors
+	} else {
+		return true, nil
+	}
+}
+
 type Customer struct {
 	gorm.Model
 	AccountBlockChainAddress string `json:"AccountBlockChainAddress" gorm:"type:varchar(1000); not null;unique;"`
@@ -150,7 +182,7 @@ func (this *Customer) AfterDelete() {
 	// performing email notification about event
 }
 
-func (this *Customer) Create() error {
+func (this *Customer) Save() error {
 	// Method, that creates Customer Profile
 }
 
@@ -186,10 +218,10 @@ func NewSmartContract(Address string, Cost int, InputData []byte, Protected bool
 	}
 }
 
-func (this *SmartContract) Save(SmartContractObj SmartContract) (*SmartContract, bool) {
+func (this *SmartContract) Create() (*SmartContract, bool) {
 	var SmartContract SmartContract
 	// Initializing Creation Transaction for Smart Contract...
-	Saved := Database.Model(smartContract).Create(&SmartContractObj)
+	Saved := Database.Model(smartContract).Create(&this)
 	if Saved.Error != nil {
 		Saved.Rollback()
 		DebugLogger.Printf(
@@ -209,8 +241,22 @@ func (this *SmartContract) Save(SmartContractObj SmartContract) (*SmartContract,
 	}
 }
 
-func (this *SmartContract) Get(SmartContractId string) (SmartContract, error) {
+func (this *SmartContract) Get(SmartContractId string) (*SmartContract, error) {
 	// Returning object of the Smart Contract...
+	var smartContract SmartContract
+	Contract := Database.Model(&SmartContract{}).Where(
+		"id = ?", SmartContractId).Find(&smartContract)
+
+	switch {
+	case Contract.Error == nil:
+		return &smartContract, nil
+
+	case Contract.Error != nil:
+		return nil, Contract.Error
+
+	default:
+		return &smartContract, nil
+	}
 }
 
 func (this *SmartContract) Rollback(smartContractObject *gorm.DB) (bool, error) {
@@ -259,16 +305,77 @@ func (this *SmartContract) GetPurchasedSmartContracts(CustomerId string) []Smart
 
 type SmartContractTransaction struct {
 	gorm.Model
+	PurchaserId      string `json:"PurchaserId" gorm:"type:varchar(1000); not null;"`
+	OwnerId          string `json:OwnerId" gorm:"type:varchar(1000); not null;"`
+	Cost             int    `json:"Cost" gorm:"type:integer;not null;"`
+	ContractMetadata string `json:"ContractMetadata" gorm:"type:varchar(10000); not null;"`
 }
 
-func NewSmartContractTransaction() *SmartContractTransaction {
-	return &SmartContractTransaction{}
+func NewSmartContractTransaction(
+	PurchaserId string, OwnerId string,
+	Cost int, ContractMetadata []byte) *SmartContractTransaction {
+
+	return &SmartContractTransaction{
+		PurchaserId:      PurchaserId,
+		OwnerId:          OwnerId,
+		Cost:             Cost,
+		ContractMetadata: string(ContractMetadata),
+	}
 }
 
-func (this *SmartContractTransaction) GetCustomerTransactions(CustomerId string) []SmartContractTransaction
+func (this *SmartContractTransaction) Get(transactionId string) (*SmartContractTransaction, error) {
 
-func (this *SmartContractTransaction) Get(transactionId string) SmartContractTransaction
+	var smartContractTransaction SmartContractTransaction
+	Exists := Database.Model(&SmartContractTransaction{}).Where(
+		"id = ?", transactionId).Find(&smartContractTransaction)
 
-func (this *SmartContractTransaction) Create() bool
+	switch {
+	case errors.Is(Exists.Error, gorm.ErrRecordNotFound):
+		return nil, Exists.Error
 
-func (this *SmartContractTransaction) Rollback() bool
+	case Exists.Error == nil:
+		return &smartContractTransaction, Exists.Error
+	default:
+		return nil, Exists.Error
+	}
+}
+
+func (this *SmartContractTransaction) Create() bool {
+
+}
+
+func (this *SmartContractTransaction) Rollback() bool {
+
+}
+
+// Annotation Methods
+
+func (this *SmartContractTransaction) GetCustomerPurchasedContractTransactions(CustomerId string) []SmartContractTransaction {
+
+	var CustomerSmartContractTransactions []SmartContractTransaction
+	Query := Database.Model(&SmartContractTransaction{}).Where(
+		"purchaser_id = ?", CustomerSmartContractTransactions).Find(&CustomerSmartContractTransactions)
+	switch {
+	case Query.Error != nil:
+		return []SmartContractTransaction{}
+	case Query.Error == nil:
+		return CustomerSmartContractTransactions
+	default:
+		return CustomerSmartContractTransactions
+	}
+}
+
+func (this *SmartContractTransaction) GetCustomerSoldContractTransactions(CustomerId string) []SmartContractTransaction {
+
+	var CustomerSmartContractTransactions []SmartContractTransaction
+	Query := Database.Model(&SmartContractTransaction{}).Where(
+		"owner_id = ?", CustomerSmartContractTransactions).Find(&CustomerSmartContractTransactions)
+	switch {
+	case Query.Error != nil:
+		return []SmartContractTransaction{}
+	case Query.Error == nil:
+		return CustomerSmartContractTransactions
+	default:
+		return CustomerSmartContractTransactions
+	}
+}

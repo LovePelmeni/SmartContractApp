@@ -28,6 +28,7 @@ var (
 	ErrorLogger *log.Logger
 )
 
+
 func init() {
 	LogFile, Error := os.OpenFile("main.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if Error != nil {
@@ -51,6 +52,8 @@ func NewServer(Host string, Port string) *Server {
 }
 
 func (this *Server) Run() {
+
+
 	Router := gin.Default()
 
 	// Authorization Rest Endpoints
@@ -78,10 +81,12 @@ func (this *Server) Run() {
 
 	httpServer := http.Server{
 		Addr: fmt.Sprintf("%s:%s", this.ServerHost, this.ServerPort),
+		Handler: Router,
 	}
 
 	Context, CancelFunc := signal.NotifyContext(context.Background(),
-		os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
+	os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
+
 	defer CancelFunc()
 
 	Exception := httpServer.ListenAndServe()
@@ -91,7 +96,6 @@ func (this *Server) Run() {
 		ErrorLogger.Printf("Failed to Start Server, Error: %s", Exception)
 		Context.Done()
 	}
-
 }
 
 func (this *Server) Shutdown(Context context.Context, ServerInstance http.Server) {

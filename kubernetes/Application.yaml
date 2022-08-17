@@ -40,7 +40,6 @@ spec:
                 - name: application-config-map  
           imagePullPolicy: IfNotPresent 
 
-
 --- 
 
 apiVersion: v1
