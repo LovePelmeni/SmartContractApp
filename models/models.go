@@ -168,26 +168,25 @@ func (this *Customer) Get(CustomerId string) Customer {
 
 type SmartContract struct {
 	gorm.Model
-	Type         string `json:"`
+	Address      string `json:"Address" gorm:"type:varchar(100); not null;"`
 	Cost         int    `json:"Cost" gorm:"type:integer;not null;"`
 	InputData    []byte `json:"InputData; omitempty;" gorm:"type:varchar(1000);default:null;"`
 	Protected    bool   `json:"Protected" gorm:"type:boolean;default:false;"`
-	PurchaserId  string `json:"Purchaser" gorm:"type:varchar(100); not null;"`
 	OwnerId      string `json:"OwnerId" gorm:"type:varchar(100); not null;"`
-	Rollbackable bool   `json:"Rollbackable" gorm"type:boolean"` // this Field will be changed to false, after Smart Contract has been Purchased.
+	Rollbackable bool   `json:"Rollbackable" gorm"type:boolean;default:true;"` // this Field will be changed to false, after Smart Contract has been Purchased.
 }
 
-func NewSmartContract(Cost int, InputData []byte, Protected bool, PurchaserId string, OwnerId string) *SmartContract {
+func NewSmartContract(Address string, Cost int, InputData []byte, Protected bool, OwnerId string) *SmartContract {
 	return &SmartContract{
-		InputData:   InputData,
-		Cost:        Cost,
-		Protected:   Protected,
-		OwnerId:     OwnerId,
-		PurchaserId: PurchaserId,
+		Address:   Address,
+		InputData: InputData,
+		Cost:      Cost,
+		Protected: Protected,
+		OwnerId:   OwnerId,
 	}
 }
 
-func (this *SmartContract) SaveContract(SmartContractObj SmartContract) (*SmartContract, bool) {
+func (this *SmartContract) Save(SmartContractObj SmartContract) (*SmartContract, bool) {
 	var SmartContract SmartContract
 	// Initializing Creation Transaction for Smart Contract...
 	Saved := Database.Model(smartContract).Create(&SmartContractObj)
@@ -210,7 +209,12 @@ func (this *SmartContract) SaveContract(SmartContractObj SmartContract) (*SmartC
 	}
 }
 
-func (this *SmartContract) RollbackContract(smartContractObject *gorm.DB) (bool, error) {
+func (this *SmartContract) Get(SmartContractId string) (SmartContract, error) {
+	// Returning object of the Smart Contract...
+}
+
+func (this *SmartContract) Rollback(smartContractObject *gorm.DB) (bool, error) {
+	// Rolling Back Creation of the Smart Contract, if it's possible and `Rollbackable` is set to True
 
 	// Getting Info About Smart Contract
 	var smartContract SmartContract
