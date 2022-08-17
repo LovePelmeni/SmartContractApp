@@ -13,6 +13,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/LovePelmeni/ContractApp/rest"
 	"github.com/gin-gonic/gin"
 )
 
@@ -51,11 +52,34 @@ func NewServer(Host string, Port string) *Server {
 
 func (this *Server) Run() {
 	Router := gin.Default()
-	Router.POST("create/contract/")
+
+	// Authorization Rest Endpoints
+
+	Router.POST("/login/", rest.LoginRestController)
+	Router.POST("/logout/", rest.LogoutRestController)
+
+	// Customer Rest Endpoints
+
+	Router.Group("/customer/")
+	{
+		Router.POST("customer/create/", rest.CreateCustomerRestController)
+		Router.PUT("/change/password/", rest.ChangePasswordRestController)
+		Router.DELETE("delete/", rest.DeleteCustomerRestController)
+	}
+
+	// Smart Contract Rest Endpoints
+
+	Router.Group("/contract/")
+	{
+		Router.POST("/create/", rest.CreateContractRestController)
+		Router.POST("/transact/", rest.PurchaseContractRestController)
+		Router.DELETE("/rollback/", rest.RollbackContractRestController)
+	}
 
 	httpServer := http.Server{
 		Addr: fmt.Sprintf("%s:%s", this.ServerHost, this.ServerPort),
 	}
+
 	Context, CancelFunc := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGSTOP)
 	defer CancelFunc()

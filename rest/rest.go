@@ -22,11 +22,15 @@ func LogoutRestController(context *gin.Context) {
 
 }
 
-func CreateCustomer(context *gin.Context) {
+func CreateCustomerRestController(context *gin.Context) {
 
 }
 
-func DeleteCustomer(context *gin.Context) {
+func ChangePasswordRestController(context *gin.Context) {
+
+}
+
+func DeleteCustomerRestController(context *gin.Context) {
 
 }
 
@@ -38,7 +42,7 @@ func PurchaseContractRestController(context *gin.Context) {
 	PurchaserId := context.Query("customerId")
 	SmartContractId := context.Query("smartContractId")
 
-	Customer := Customer.Get(CustomerId)
+	Customer := Customer.Get(PurchaserId)
 	SmartContractManager := ethereum.NewSmartContractManager(Customer.AccountBlockChainAddress)
 	ContractTransaction, TransactError := SmartContractManager.TransactSmartContract(SmartContractId)
 

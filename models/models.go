@@ -154,7 +154,7 @@ func (this *Customer) Create() error {
 	// Method, that creates Customer Profile
 }
 
-func (this *Customer) Update(Password ...string) {
+func (this *Customer) ChangePassword(Password ...string) {
 	// Method, that updates Customer Profile
 }
 
@@ -168,12 +168,13 @@ func (this *Customer) Get(CustomerId string) Customer {
 
 type SmartContract struct {
 	gorm.Model
-	Type        string `json:"`
-	Cost        int    `json:"Cost" gorm:"type:integer;not null;"`
-	InputData   []byte `json:"InputData; omitempty;" gorm:"type:varchar(1000);default:null;"`
-	Protected   bool   `json:"Protected" gorm:"type:boolean;default:false;"`
-	PurchaserId string `json:"Purchaser" gorm:"type:varchar(100); not null;"`
-	OwnerId     string `json:"OwnerId" gorm:"type:varchar(100); not null;"`
+	Type         string `json:"`
+	Cost         int    `json:"Cost" gorm:"type:integer;not null;"`
+	InputData    []byte `json:"InputData; omitempty;" gorm:"type:varchar(1000);default:null;"`
+	Protected    bool   `json:"Protected" gorm:"type:boolean;default:false;"`
+	PurchaserId  string `json:"Purchaser" gorm:"type:varchar(100); not null;"`
+	OwnerId      string `json:"OwnerId" gorm:"type:varchar(100); not null;"`
+	Rollbackable bool   `json:"Rollbackable" gorm"type:boolean"` // this Field will be changed to false, after Smart Contract has been Purchased.
 }
 
 func NewSmartContract(Cost int, InputData []byte, Protected bool, PurchaserId string, OwnerId string) *SmartContract {
@@ -209,14 +210,23 @@ func (this *SmartContract) SaveContract(SmartContractObj SmartContract) (*SmartC
 	}
 }
 
-func (this *SmartContract) RollbackContract(SmartContract *gorm.DB) bool {
-	RolledBack := SmartContract.Rollback()
-	if RolledBack.Error != nil {
-		DebugLogger.Printf(
-			"Failed to Rollback Smart Contract Transaction, Error: %s", RolledBack.Error)
-		return false
+func (this *SmartContract) RollbackContract(smartContractObject *gorm.DB) (bool, error) {
+
+	// Getting Info About Smart Contract
+	var smartContract SmartContract
+	smartContractObject.Find(&smartContract)
+
+	if smartContract.Rollbackable != true {
+		return false, errors.New("Rollback is Not Allowed, Contract is Already Purchased")
+	} else {
+		RolledBack := smartContractObject.Rollback()
+		if RolledBack.Error != nil {
+			DebugLogger.Printf(
+				"Failed to Rollback Smart Contract Transaction, Error: %s", RolledBack.Error)
+			return false, RolledBack.Error
+		}
+		return true, nil
 	}
-	return true
 }
 
 // Annotation Methods
